@@ -14,6 +14,56 @@ NAME = 'coffee_build'
 DESC =
   'Compiles Coffeescript files, optionally merging and generating source maps.'
 
+
+# Cache of parsed/processed files, keeps track of the last modified date
+# so we can avoid processing it again.
+# Useful when this task is used in conjunction with grunt-contib-watch
+# in large coffeescript projects
+buildCache = {file: {}, dir:{}}
+
+
+mtime = (fp) -> fs.statSync(fp).mtime.getTime()
+
+
+buildToDirectory = (grunt, options, f) ->
+  cwd = f.orig.cwd || '.'
+  outFile = f.dest
+  outDir = path.dirname(outFile)
+
+  f.src.forEach (file) ->
+    if not grunt.file.exists(file)
+      grunt.log.warn('Source file "' + file + '" not found.')
+      return
+    entry = buildCache.dir[file]
+    mt = mtime(file)
+    if mt != entry?.mtime or outFile not of entry?.generated
+      if mt != entry?.mtime
+        src = grunt.file.read(file)
+        compiled = compile(src, {
+          sourceMap: options.sourceMap
+          bare: not options.wrap
+        })
+        grunt.log.writeln("Compiled #{file}")
+        if options.sourceMap
+          {js: compiled, v3SourceMap} = compiled
+          v3SourceMap = JSON.parse(v3SourceMap)
+          v3SourceMap.sourceRoot = path.relative(outDir, cwd)
+          v3SourceMap.file = path.basename(outFile)
+          v3SourceMap.sources[0] = path.relative(cwd, file)
+          v3SourceMap = JSON.stringify(v3SourceMap)
+          compiled += "\n\n//@ sourceMappingURL=#{path.basename(outFile)}.map"
+          grunt.file.write("#{outFile}.map", v3SourceMap)
+          grunt.log.writeln("File #{outFile}.map was created")
+        buildCache.dir[file] =
+          mtime: mt
+          compiled: compiled
+          map: v3SourceMap
+          generated: {}
+      grunt.file.write(outFile, compiled)
+      grunt.log.writeln("File #{outFile} was created")
+      buildCache.dir[file].generated[outFile] = null
+
+
 # Function adapted from the same helper in traceur compiler code.
 # It generates an ugly identifier for a given pathname relative to
 # the current file being processed, eg:
@@ -40,14 +90,6 @@ generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$__') ->
   id = "$#{prefix + url.replace(cwd, '').replace(/[^\d\w$]/g, '_')}"
   return {id: id, url: path.relative(cwd, url)}
 
-
-# Cache of parsed/processed files, keeps track of the last modified date
-# so we can avoid processing it again.
-# Useful when this task is used in conjunction with grunt-contib-watch
-# in large coffeescript projects
-parseCache = {}
-
-mtime = (fp) -> fs.statSync(fp).mtime.getTime()
 
 buildToFile = (grunt, options, f) ->
   # checks if the node is a require call to a relative path, if so
@@ -96,26 +138,32 @@ buildToFile = (grunt, options, f) ->
   pending = {}
   parsed = {}
   bundle = []
-  files = f.src.slice()
   outFile = f.dest
   outDir = path.dirname(outFile)
+
+  files = f.src.filter (file) ->
+    file = path.join(cwd, file)
+    if not grunt.file.exists(file)
+      grunt.log.warn('Source file "' + file + '" not found.')
+      return false
+    return true
 
   while files.length
     fn = files.shift()
     fp = path.join(cwd, fn)
     if fp of parsed
       continue
-    if (mt = mtime(fp)) != parseCache[fp]?.mtime
+    if (mt = mtime(fp)) != buildCache.file[fp]?.mtime
       deps = []
       node = nodes(grunt.file.read(fp))
       node.traverseChildren(true, nodeVisitor)
-      if not options.wrapIgnore or fn not in options.wrapIgnore
+      if not options.disableModuleWrap or fn not in options.disableModuleWrap
         node = makeModule(node, generateNameForUrl(grunt, fn, '.', '.'))
-      cacheEntry = parseCache[fp] =
+      cacheEntry = buildCache.file[fp] =
         {node: node, mtime: mt, deps: deps, fragments: null, fname: fn}
-      grunt.log.writeln("Parsed #{fp}")
+      grunt.log.writeln("Compiled #{fp}")
     else
-      cacheEntry = parseCache[fp]
+      cacheEntry = buildCache.file[fp]
       {node, deps} = cacheEntry
     if deps.length and fp not of pending
       pending[fp] = null
@@ -127,9 +175,11 @@ buildToFile = (grunt, options, f) ->
     bundle.push(cacheEntry)
   # generate code
   output = ''
-  if options.sourceMaps
+  if options.sourceMap
     lineOffset = 0
     columnOffset = 0
+    if options.wrap
+      lineOffset++
     map = new SourceMapGenerator({
       file: path.basename(outFile)
       sourceRoot: path.relative(outDir, cwd)
@@ -140,7 +190,7 @@ buildToFile = (grunt, options, f) ->
     delete entry.node # free a little bit of memory
     for fragment in fragments
       # ripped from coffeescript source
-      if options.sourceMaps
+      if options.sourceMap
         debugger
         if (fragment.locationData and lineOffset > 0 and
             fragment.locationData.first_line)
@@ -158,16 +208,20 @@ buildToFile = (grunt, options, f) ->
         if lineCount
           columnOffset -= fragment.code.lastIndexOf('\n')
       output += fragment.code
-  if options.sourceMaps
+  if options.wrap
+    output = '(function() {\n' + output + '})();'
+  if options.sourceMap
     sourceMapDest = path.basename(outFile) + '.map'
     output += "\n\n//@ sourceMappingURL=#{sourceMapDest}"
     grunt.file.write("#{outFile}.map", map.toString())
+    grunt.log.writeln("File #{outFile}.map was created")
   grunt.file.write(outFile, output)
+  grunt.log.writeln("File #{outFile} was created")
 
 
 module.exports = (grunt) ->
   grunt.registerMultiTask NAME, DESC, ->
-    options = this.options(sourceMap: true)
+    options = this.options(sourceMap: true, wrap: true)
 
     @files.forEach (f) ->
       if /\.js$/.test(f.orig.dest)
