@@ -1,7 +1,7 @@
 {
   "name": "grunt-coffee-build",
   "description": "Compiles Coffeescript files, optionally merging and generating source maps.",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "homepage": "https://github.com/tarruda/grunt-coffee-build",
   "author": {
     "name": "Thiago de Arruda",
@@ -30,7 +30,6 @@
   "devDependencies": {
     "grunt-contrib-clean": "~0.4.0",
     "grunt": "~0.4.1",
-    "source-map": "~0.1.27",
     "source-map-support": "~0.2.1"
   },
   "peerDependencies": {
@@ -40,6 +39,7 @@
     "gruntplugin"
   ],
   "dependencies": {
+    "source-map": "~0.1.27",
     "coffee-script": "~1.6.3",
     "uglify-js": "~2.3.6"
   }

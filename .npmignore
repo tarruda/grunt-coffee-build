@@ -2,3 +2,5 @@
 .ackrc
 .jshintrc
 .gitignore
+/build/
+/tmp/

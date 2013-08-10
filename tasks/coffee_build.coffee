@@ -188,6 +188,7 @@ buildToFile = (grunt, options, f) ->
 
   while files.length
     fn = files.shift()
+    debugger
     fp = path.join(cwd, fn)
     if fp of processed
       continue
@@ -199,6 +200,7 @@ buildToFile = (grunt, options, f) ->
         {js, v3SourceMap} = makeModule(
           grunt, js, v3SourceMap, fn, fp, cwd, deps)
       else
+        console.log fn
         {js, v3SourceMap} = replaceRequires(
           grunt, js, v3SourceMap, fn, fp, cwd, deps)
       cacheEntry = buildCache.file[fp] =
@@ -207,12 +209,18 @@ buildToFile = (grunt, options, f) ->
     else
       # Use the entry from cache
       {deps, js, v3SourceMap, fn} = cacheEntry = buildCache.file[fp]
-    if deps.length and fp not of pending
-      pending[fp] = null
-      files.push(fn)
+    if deps.length
+      depsProcessed = true
       for dep in deps
-        files.unshift(dep)
-      continue
+        if dep not of processed
+          depsProcessed = false
+          break
+      if not depsProcessed and fp not of pending
+        pending[fp] = null
+        files.unshift(fn)
+        for dep in deps when dep not of pending
+          files.unshift(dep)
+        continue
     # flag the file as processed
     processed[fp] = null
     # concatenate the file output, and update the result source map
