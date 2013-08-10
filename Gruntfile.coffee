@@ -21,7 +21,6 @@ module.exports = (grunt) ->
         src: '**/*.coffee'
         dest: 'build/build.js'
       directory:
-        ext: '.js'
         expand: true
         flatten: false
         cwd: 'test'
