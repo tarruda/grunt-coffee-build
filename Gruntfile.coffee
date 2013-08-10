@@ -18,13 +18,13 @@ module.exports = (grunt) ->
         disableModuleWrap: ['index.coffee']
       file:
         cwd: 'test'
-        src: '**/*.coffee'
+        src: ['**/*.coffee', 'plain.js']
         dest: 'build/build.js'
       directory:
         expand: true
         flatten: false
         cwd: 'test'
-        src: '**/*.coffee'
+        src: ['**/*.coffee', 'plain.js']
         dest: './build/all'
 
 

@@ -38,6 +38,11 @@ buildToDirectory = (grunt, options, f) ->
     if not grunt.file.exists(file)
       grunt.log.warn('Source file "' + file + '" not found.')
       return
+    if /\.js/.test(file)
+      # plain js, just copy to the output dir
+      grunt.file.copy(file, outFile)
+      grunt.log.writeln("Copied #{file} to #{outFile}")
+      return
     entry = buildCache.dir[file]
     mt = mtime(file)
     if mt != entry?.mtime or outFile not of entry?.generated
@@ -87,7 +92,7 @@ generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$__') ->
     if grunt.file.isDir(url)
       # its possible to require directories that have an index.coffee file
       url = path.join(url, 'index')
-    ext = /\.coffee$/
+    ext = /\.(coffee|js)$/
     if ext.test(url)
       url = url.replace(ext, '')
   catch e
@@ -123,7 +128,10 @@ replaceRequires = (grunt, js, fn, fp, cwd, deps) ->
     before = js.slice(0, start)
     after = js.slice(end)
     js = before + mod.id + after
-    deps.push(mod.url + '.coffee')
+    url = mod.url + '.coffee'
+    if not grunt.file.exists(path.join(cwd, url))
+      url = mod.url + '.js'
+    deps.push(url)
     return
 
   posOffset = 0

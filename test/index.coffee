@@ -16,3 +16,5 @@ func = ->
   cat.kill()
 
 func()
+
+require './plain'
