@@ -16,48 +16,76 @@ grunt.loadNpmTasks('grunt-coffee-build');
 ### Overview
 
 This task will take care of compiling, merging and generating source maps for
-your coffeescript files. It intends to provide a one-stop solution for
-building web browsers or node.js coffeescript projects.
+your .coffee/.js files. It also supports merging javascript files, and the
+resulting source map will contain information about each individual file.
+
+While the name is 'coffee-build', this task may be used with javascript-only
+projects just for the automatic dependency resolution and merged source map
+generation.
 
 Unlike other solutions that normalize commonjs projects to work in web
 browsers, this one won't bundle small commonjs runtime. Instead, it will
 parse all require calls for relative paths, concatenate files in dependency
 order while wrapping each file into a commonjs-like closure. All require
 calls are replaced by a module identifier generated from the file path(An
-idea taken from the google-traceur compiler)
+idea taken from the google-traceur compiler).
 
 The task integrates nicely with grunt-contrib-watch, as it will keep an
 in-memory cache of the compiled files and their modification date, so only
 modified files will be recompiled.
 
+This intends to provide a one-stop solution for building projects for
+web browsers or node.js using coffeescript and/or javascript
+
 ### Example usage
 
-This example shows how one can configure grunt to build a library that will
-work seamless across web browsers and node.js:
+This example shows how you can configure a project that includes third party
+libraries and needs to have platform-specific builds (browser/node.js):
 
 ```coffeescript
+# Gruntfile.coffee
 grunt.initConfig
-  clean:
-    all: ['build']
-
+  # This project should work seamless in browser and node.js. Each platform
+  # will have a single .js file containing all the code, and a single .map
+  # file that can be used to easily debug using node-inspector or any browser
+  # that supports source map debugging.
+ 
   coffee_build:
     options:
+      # default options
       wrap: true # wrap the result into an anonymous function
       sourceMap: true # generate source maps
-      disableModuleWrap: ['index.coffee'] # disable module wrapping for the files listed here when doing a concatenated build
-    browser_build: # browser version is distributed as a single file
+    browser_build:
+      options:
+        # Merge the third party library into the browser dist, but disable source
+        # map generation and module wrapping for it. The browser_export.js file
+        # will export the public API to the window object(it needs to be included last).
+        disableModuleWrap: ['third_party/lib.js', 'platform/browser_export.js']
+        disableSourceMap: ['third_party/lib.js']
       files: [
       # src files
-      {cwd: 'src', src: '**/*.coffee', dest: './dist/browser/src.js'}
-      # test files
-      {cwd: 'test', src: '**/*.coffee', dest: './dist/browser/test.js'}
+      {src: ['third_party/lib.js', 'src/**/*.coffee'], dest: './dist/browser_src.js'}
+      # Test files. Since sources are likely to be required by the test files,
+      # 'browser_test' is the only file that needs to be included in the
+      # index.html that bootstraps the tests
+      {src: ['third_party/lib.js', 'src/**/*.coffee', 'platform/browser_export.js' ], dest: './dist/browser_test.js'}
       ]
-    nodejs_build: # nodejs version files are compiled individually
+    nodejs_build:
+      options:
+        # The node.js version dont need to merge the library, but cannot include
+        # it using require in the sources shared with the browser(require calls to
+        # relative paths are preprocessed), so we use a special node-only file that is
+        # concatenated first and will require the library into the package namespace.
+        # Besides dependency initialization, this file might contain nodejs-specific code,
+        # so we dont include it in 'disableSourceMap' for debugging. We also need to
+        # export the package API, so the 'index.js' file is not wrapped into a module so
+        # the 'module/exports' names are bound to the nodejs module object.
+        disableModuleWrap: ['platform/nodejs_init.js', 'platform/nodejs_export.js']
       files: [
       # src files
-      {expand: true, cwd: 'src', src: '**/*.coffee', dest: './dist/nodejs/src'}
+      {src: ['platform/nodejs_init.js', 'src/**/*.coffee', 'platform/nodejs_export.js'], dest: './dist/nodejs_src.js'}
       # test files
-      {expand: true, cwd: 'test', src: '**/*.coffee', dest: './dist/nodejs/test'}
+      {src: ['platform/nodejs_init.js', 'test/**/*.coffee', 'platform/nodejs_export.js'], dest: './dist/nodejs_test.js'}
       ]
 ```
 
@@ -72,5 +100,11 @@ module/exports defined).
 ### Comments
 
 The main reason I wrote this task is because I couldn't get any existing grunt
-task to do what I wanted: provide me with a single javascript file/source map
-that maps(correctly) to the original source files
+task to do what I wanted: Provide me with a single javascript file/source map
+that maps(correctly) to the original source files and that lets me easily
+integrate javascript/coffeescript with automatic dependency resolution, while
+letting me handle platform-specific particularities without runtime hacks.
+
+The source maps generated by this task work flawless(at least in my tests),
+debugging with [node-inspector](https://github.com/node-inspector/node-inspector)(0.3.2)
+or google chrome should just work.
