@@ -9,7 +9,7 @@ module.exports = (grunt) ->
 
   grunt.initConfig
     clean:
-      tests: ['build']
+      all: ['build']
 
     coffee_build:
       options:
