@@ -274,7 +274,7 @@ buildToFile = (grunt, options, f) ->
     lineOffset += js.split('\n').length - 1
     output += js
   if options.wrap
-    output = '(function() {\n' + output + '\n})();'
+    output = '(function(self) {\n' + output + '\n}).call({}, this);'
   if options.sourceMap
     sourceMapDest = path.basename(outFile) + '.map'
     output += "\n\n//@ sourceMappingURL=#{sourceMapDest}"
