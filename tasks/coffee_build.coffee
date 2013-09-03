@@ -48,10 +48,14 @@ buildToDirectory = (grunt, options, f) ->
     if mt != entry?.mtime or outFile not of entry?.generated
       if mt != entry?.mtime
         src = grunt.file.read(file)
-        compiled = compile(src, {
-          sourceMap: options.sourceMap
-          bare: not options.wrap
-        })
+        try
+          compiled = compile(src, {
+            sourceMap: options.sourceMap
+            bare: not options.wrap
+          })
+        catch e
+          grunt.log.error("#{e.message}(line: #{e.location.last_line}, column: #{e.location.last_column})")
+          throw e
         grunt.log.writeln("Compiled #{file}")
         if options.sourceMap
           {js: compiled, v3SourceMap} = compiled
@@ -223,8 +227,12 @@ buildToFile = (grunt, options, f) ->
     if (mt = mtime(fp)) != buildCache.file[fp]?.mtime
       deps = []
       if (/\.coffee$/.test(fp))
-        {js, v3SourceMap} = compile(grunt.file.read(fp), {
-          sourceMap: true, bare: true})
+        try
+          {js, v3SourceMap} = compile(grunt.file.read(fp), {
+            sourceMap: true, bare: true})
+        catch e
+          grunt.log.error("#{e.message}(line: #{e.location.last_line}, column: #{e.location.last_column})")
+          throw e
       else # plain js
         js = grunt.file.read(fp)
         v3SourceMap = null
