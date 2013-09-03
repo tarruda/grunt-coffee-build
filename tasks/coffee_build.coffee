@@ -54,7 +54,7 @@ buildToDirectory = (grunt, options, f) ->
             bare: not options.wrap
           })
         catch e
-          grunt.log.error("#{e.message}(line: #{e.location.last_line}, column: #{e.location.last_column})")
+          grunt.log.error("#{e.message}(file: #{file}, line: #{e.location.last_line}, column: #{e.location.last_column})")
           throw e
         grunt.log.writeln("Compiled #{file}")
         if options.sourceMap
@@ -231,7 +231,7 @@ buildToFile = (grunt, options, f) ->
           {js, v3SourceMap} = compile(grunt.file.read(fp), {
             sourceMap: true, bare: true})
         catch e
-          grunt.log.error("#{e.message}(line: #{e.location.last_line}, column: #{e.location.last_column})")
+          grunt.log.error("#{e.message}(file: #{fn}, line: #{e.location.last_line}, column: #{e.location.last_column})")
           throw e
       else # plain js
         js = grunt.file.read(fp)
