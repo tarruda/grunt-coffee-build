@@ -31,6 +31,7 @@ module.exports = (grunt) ->
   grunt.loadTasks('tasks')
 
   grunt.loadNpmTasks('grunt-contrib-clean')
+  grunt.loadNpmTasks('grunt-release')
 
   grunt.registerTask('test', ['clean', 'coffee_build'])
   grunt.registerTask('default', ['test'])

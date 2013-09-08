@@ -30,7 +30,8 @@
   "devDependencies": {
     "grunt-contrib-clean": "~0.4.0",
     "grunt": "~0.4.1",
-    "source-map-support": "~0.2.1"
+    "source-map-support": "~0.2.1",
+    "grunt-release": "~0.5.1"
   },
   "peerDependencies": {
     "grunt": "~0.4.1"
