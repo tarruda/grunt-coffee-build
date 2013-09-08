@@ -28,21 +28,23 @@ mtime = (fp) -> fs.statSync(fp).mtime.getTime()
 
 buildToDirectory = (grunt, options, f) ->
   cwd = f.orig.cwd or '.'
-  outFile = f.dest
-  outDir = path.dirname(outFile)
+  outDir = f.dest
 
-  if /\.coffee$/.test(outFile)
-    outFile = outFile.replace(/\.coffee$/, '.js')
+  if not grunt.file.exists(outDir)
+    grunt.file.mkdir(outDir)
 
   f.src.forEach (file) ->
+    file = path.join(cwd, file)
     if not grunt.file.exists(file)
       grunt.log.warn('Source file "' + file + '" not found.')
       return
-    if /\.js/.test(file)
+    outFile = path.join(outDir, path.relative(cwd, file))
+    if /\.js/.test(outFile)
       # plain js, just copy to the output dir
       grunt.file.copy(file, outFile)
       grunt.log.writeln("Copied #{file} to #{outFile}")
       return
+    outFile = outFile.replace(/\.coffee$/, '.js')
     entry = buildCache.dir[file]
     mt = mtime(file)
     if mt != entry?.mtime or outFile not of entry?.generated
