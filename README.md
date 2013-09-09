@@ -1,6 +1,6 @@
 # grunt-coffee-build
 
-> Compiles coffeescript files, optionally merging and generating source maps.
+> Compiles hybrid coffeescript/javscript commonjs projects to run anywhere transparently(amd, commonjs or plain browser load) 
 
 ## Getting Started
 ```shell
@@ -20,8 +20,8 @@ your .coffee/.js files. If merging, the resulting source map will contain
 information about each individual file so they can be debugged separately.
 
 While the name is 'coffee-build', this task may be used in javascript-only
-projects just for the automatic dependency resolution and merged source map
-generation.
+commonjs projects just for the automatic dependency resolution and merged
+source map generation.
 
 Unlike other solutions that normalize commonjs projects to work in web
 browsers, this one won't bundle a small commonjs runtime. Instead, it will
@@ -30,72 +30,73 @@ order while wrapping each file into a commonjs-like module. All require
 calls are replaced by a module identifier generated from the file path
 (This is how google-traceur compiler handles imports when merging files)
 
-The task integrates nicely with grunt-contrib-watch, as it will keep an
-in-memory cache of the compiled files and their modification date, so only
-modified files will be reprocessed.
+When compiling the project to a single file, the task will wrap everything into
+[umd](https://github.com/umdjs/umd), and the result runs anywhere a umd module
+would run. This mode of operation also integrates nicely with
+grunt-contrib-watch, as it will keep an in-memory cache of the compiled files
+and their modification date, so only modified files will be reprocessed.
+
+When compiling to a directory(normal commonjs target) each file modification
+timestamp will be saved, so only modified files are recompiled(even across
+grunt restarts).
 
 ### Example usage
 
-This example shows how you can configure a project that includes third party
-libraries and needs to have platform-specific builds (browser/node.js):
+This example shows a real project([vm.js](https://github.com/tarruda/vm.js))
+that runs on browser or node.js. It depends on the 'esprima' parser, so
+third party library handling is also illustrated:
 
 ```coffeescript
 # Gruntfile.coffee
-grunt.initConfig
-  # This project should work seamless in browser and node.js. Each platform
-  # will have a single .js file containing all the code, and a single .map
-  # file that can be used to easily debug using node-inspector or any browser
-  # that supports source map debugging.
- 
   coffee_build:
-    options:
-      # default options
-      wrap: true # wrap the result into an anonymous function
-      sourceMap: true # generate source maps
-    browser_build:
-      options:
-        # Merge the third party library into the browser dist, but disable source
-        # map generation and module wrapping for it. The browser_export.js file
-        # will export the public API to the window object(it needs to be included last).
-        disableModuleWrap: ['third_party/lib.js', 'platform/browser_export.js']
-        disableSourceMap: ['third_party/lib.js']
-      files: [
-      # Src build
-      {src: ['third_party/lib.js', 'src/**/*.coffee', 'platform/browser_export.js'], dest: './dist/browser_src.js'}
-      # Test build. Since sources are likely to be required by the test files,
-      # 'browser_test.js' is the only file that needs to be included in the
-      # index.html that bootstraps the tests.
-      {src: ['third_party/lib.js', 'src/**/*.coffee', 'platform/browser_export.js'], dest: './dist/browser_test.js'}
-      ]
-    nodejs_build:
-      options:
-        # The node.js version doesn't need to merge the library, but cannot include it
-        # using 'require' calls in the sources shared with the browser(only require calls
-        # to relative paths are preprocessed, but 'require' will be unavailable in the
-        # browser), so we use a special node-only file (node_init.js) that is concatenated
-        # first and will require the library into the package namespace. Besides
-        # dependency initialization, this file might contain nodejs-specific code, so we
-        # won't include it in 'disableSourceMap' since we need to debug.  We also need to
-        # export the package API, so the 'nodejs_export.js' file is not wrapped into an internal
-        # module since the 'module/exports' names need to be bound to the real nodejs
-        # module object(this file must be included last).
-        disableModuleWrap: ['platform/nodejs_init.js', 'platform/nodejs_export.js']
-      files: [
-      # src files
-      {src: ['platform/nodejs_init.js', 'src/**/*.coffee', 'platform/nodejs_export.js'], dest: './dist/nodejs_src.js'}
-      # test files
-      {src: ['platform/nodejs_init.js', 'test/**/*.coffee', 'platform/nodejs_export.js'], dest: './dist/nodejs_test.js'}
-      ]
+      options: # options shared across all targets:
+        moduleId: 'Vm'
+        # it is necessary to specify a main file which exports the
+        # module public API, just like one normally does in a package.json
+        # file 
+        main: 'src/index.coffee'
+        src: 'src/**/*.coffee'
+      browser:
+        # this target will build everything to a single umd module.
+        # it is meant for javascript environments without a module loader
+        # like web browsers, but it should work anywhere.
+        options:
+          # if you depend on a third party library of a specific version
+          # and are targeting web browsers without a module loader,
+          # bundle the library in the 'includedDeps' options and it will be
+          # run in a fake global object/context so it can coexists with
+          # other versions of the library already loaded.
+          # As an altenative you can just load the third party library
+          # separately.
+          # 
+          # In this particular case everything works because esprima uses the
+          # same name for the node.js module and the browser global object(it
+          # is also wrapped in umd). 
+          # 
+          # In most cases this should work as long as the library is consistent
+          # regarding its global object alias and commonjs module name
+          includedDeps: 'node_modules/esprima/esprima.js'
+          dest: 'build/browser/vm.js'
+      browser_test:
+        # this target will build a bundle containing the code plus
+        # automated tests. no need to add the files in the 'src' directory
+        # since the tests will require the source files
+        options:
+          src: 'test/**/*.coffee'
+          dest: 'build/browser/test.js'
+      nodejs_test:
+        # while the above target could also be reused, this is preferred
+        # when you dont need to re-run browser tests everytime,
+        # as only modified files will ever need to be recompiled since
+        # files are being compiled individually. (when merging compilation
+        # will only be cached in memory, so it works better with
+        # grunt-contrib-watch and nospawn: true)
+        options:
+          src: ['src/**/*.coffee', 'test/**/*.coffee']
+          # if the destination doesnt end with '.js' it will be considered
+          # a directory build
+          dest: 'build/nodejs'
 ```
-
-As the above example shows, when a filename is passed to 'dest', the task will
-concatenate all files, generating a source map that maps back to the original files.
-
-By default each merged file is wrapped into a module function that simulates a
-commonjs environment. Files added to the 'disableModuleWrap' option will be
-excluded.
-
-If a directory is specified as dest, files will be transformed individually.
 
 ### Comments
 
@@ -106,8 +107,9 @@ integrate javascript/coffeescript with automatic dependency resolution, while
 letting me handle platform-specific particularities without runtime hacks.
 
 The source maps generated by this task work flawless(at least in my tests).
-Debugging with [node-inspector](https://github.com/node-inspector/node-inspector)(0.3.2)
-or google chrome should just work.
+Debugging with
+[node-inspector](https://github.com/node-inspector/node-inspector)(0.3.2) or
+google chrome should just work.
 
-This intends to provide a one-stop solution for building projects for
-web browsers or node.js using coffeescript and/or javascript. Enjoy!
+This intends to provide a one-stop solution for building projects for web
+browsers or node.js using coffeescript and/or javascript. Enjoy!

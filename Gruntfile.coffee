@@ -13,11 +13,11 @@ module.exports = (grunt) ->
 
     coffee_build:
       options:
+        main: 'index.coffee'
         src_base: 'test'
         src: ['**/*.coffee', 'plain.js']
       file:
         options:
-          disableModuleWrap: 'index.coffee'
           includedDeps: 'test/includedDep.js'
           dest: 'build/build.js'
       directory:

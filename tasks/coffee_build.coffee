@@ -50,7 +50,7 @@ buildToDirectory = (grunt, options, src) ->
     entry = timestampCache[file]
     mt = mtime(file)
     if /\.js/.test(outFile)
-      if mt != entry?.mtime
+      if not grunt.file.exists(outFile) or mt != entry?.mtime
         # plain js, just copy to the output dir
         grunt.file.copy(file, outFile)
         grunt.log.writeln("Copied #{file} to #{outFile}")
@@ -58,7 +58,7 @@ buildToDirectory = (grunt, options, src) ->
       return
     outFile = outFile.replace(/\.coffee$/, '.js')
     fileOutDir = path.dirname(outFile)
-    if mt != entry?.mtime
+    if not grunt.file.exists(outFile) or mt != entry?.mtime
       src = grunt.file.read(file)
       try
         compiled = compile(src, {
@@ -221,6 +221,15 @@ buildToFile = (grunt, options, src) ->
   amdDeps = {}
   {dest: outFile, expand} = options
   outDir = path.dirname(outFile)
+
+  if options.main
+    if Array.isArray(options.disableModuleWrap)
+      options.disableModuleWrap.push(options.main)
+    else
+      current = options.disableModuleWrap
+      options.disableModuleWrap = [options.main]
+      if current
+        options.disableModuleWrap.push(current)
 
   if options.disableModuleWrap
     disableModuleWrap = grunt.file.expand(expand, options.disableModuleWrap)
