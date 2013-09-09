@@ -252,7 +252,7 @@ buildToFile = (grunt, options, src) ->
   lineOffset = 1
 
   if options.umd
-    lineOffset = 22
+    lineOffset = 6
 
   while files.length
     fn = files.shift()
@@ -331,8 +331,25 @@ buildToFile = (grunt, options, src) ->
 # based on: https://github.com/alexlawrence/grunt-umd
 render = (grunt, code, options, amdDeps) ->
   amdDeps = Object.keys(amdDeps)
-  moduleId = options.moduleId or 'MODULE'
-  globalAlias = options.globalAlias or moduleId
+  globalAliases = options.globalAliases
+
+  if options.moduleId
+    if Array.isArray(globalAliases)
+      globalAliases.push(options.moduleId)
+    else
+      globalAliases = [options.moduleId]
+
+  if not Array.isArray(globalAliases)
+    globalAliases = []
+
+  if not globalAliases.length
+    if grunt.file.exists('package.json')
+      pkg = grunt.file.readJSON('package.json')
+      if pkg.name
+        globalAliases.push(pkg.name)
+
+  if not globalAliases.length
+    throw new Error('cannot determine a global alias for the module')
 
   if options.includedDeps
     includedDeps =
@@ -342,8 +359,7 @@ render = (grunt, code, options, amdDeps) ->
 
   ctx =
     code: code
-    moduleId: moduleId
-    globalAlias: globalAlias
+    globalAliases: globalAliases
     amdDeps: ("'#{dep}'" for dep in amdDeps).join(', ')
     includedDeps: includedDeps
 
@@ -352,39 +368,47 @@ render = (grunt, code, options, amdDeps) ->
 
 UMD_TEMPLATE = handlebars.compile(
   """
-  (function(root, factory, dependenciesFactory) {
-      // load included dependencies into a fake global/window object
-      var fakeGlobal = {};
-      dependenciesFactory.call(fakeGlobal, fakeGlobal, fakeGlobal);
-      if(typeof exports === 'object') {
-          module.exports = factory(require, exports, module);
-      }
-      else if(typeof define === 'function' && define.amd) {
-          define({{#if moduleId}}'{{moduleId}}', {{/if}}[{{#if amdDeps}}{{{amdDeps}}}, {{/if}}'require', 'exports', 'module'], factory);
-      }
-      else {
-          var req = function(id) {
-            if (!(id in fakeGlobal) && !(id in root)) throw new Error('Module ' + id + ' not found');
-            return fakeGlobal[id] || root[id];
-          },
-            mod = {exports: {}},
-            exp = mod.exports;
-          root['{{globalAlias}}'] = factory(req, exp, mod);
-      }
-  })(this,
-    (function(require, exports, module, undefined) {
+  (function(root, factory, dependenciesFactory, setup) {
+    setup(root, factory, dependenciesFactory);
+  })(
+  this,
+  (function(require, exports, module, undefined) {
 
   {{{code}}}
       
   return module.exports;
   }),
-    (function(global, window) {
+  (function(global, window) {
     {{#each includedDeps}}
     (function(undefined) {
       {{{.}}}
     }).call(this);
     {{/each}}
-  }));
+  }),
+  (function(root, factory, dependenciesFactory) {
+    // load included dependencies into a fake global/window object
+    var fakeGlobal = {};
+    dependenciesFactory.call(fakeGlobal, fakeGlobal, fakeGlobal);
+    if(typeof exports === 'object') {
+        module.exports = factory(require, exports, module);
+    }
+    else if(typeof define === 'function' && define.amd) {
+        define({{#if moduleId}}'{{moduleId}}', {{/if}}[{{#if amdDeps}}{{{amdDeps}}}, {{/if}}'require', 'exports', 'module'], factory);
+    }
+    else {
+        var req = function(id) {
+          if (!(id in fakeGlobal) && !(id in root)) throw new Error('Module ' + id + ' not found');
+          return fakeGlobal[id] || root[id];
+        },
+          mod = {exports: {}},
+          exp = mod.exports;
+        mod = factory(req, exp, mod);
+        {{#each globalAliases}}
+        root['{{{.}}}'] = mod;
+        {{/each}}
+    }
+  })
+  );
   """
 )
 
