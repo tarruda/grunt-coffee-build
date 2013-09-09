@@ -16,12 +16,13 @@ NAME = 'coffee_build'
 DESC =
   'Compiles Coffeescript files, optionally merging and generating source maps.'
 
+TIMESTAMP_CACHE = '.modification_timestamp.log'
 
 # Cache of compiledfiles, keeps track of the last modified date
 # so we can avoid processing it again.
 # Useful when this task is used in conjunction with grunt-contib-watch
 # in large coffeescript projects
-buildCache = {file: {}, dir:{}}
+buildCache = {}
 
 
 mtime = (fp) -> fs.statSync(fp).mtime.getTime()
@@ -30,6 +31,11 @@ mtime = (fp) -> fs.statSync(fp).mtime.getTime()
 buildToDirectory = (grunt, options, src) ->
   cwd = options.src_base
   outDir = options.dest
+
+  if grunt.file.exists(TIMESTAMP_CACHE)
+    timestampCache = grunt.file.readJSON(TIMESTAMP_CACHE)
+  else
+    timestampCache = {}
 
   if not grunt.file.exists(outDir)
     grunt.file.mkdir(outDir)
@@ -41,46 +47,43 @@ buildToDirectory = (grunt, options, src) ->
       grunt.log.warn('Source file "' + file + '" not found.')
       return
     outFile = path.join(outDir, path.relative(cwd, file))
+    entry = timestampCache[file]
+    mt = mtime(file)
     if /\.js/.test(outFile)
-      # plain js, just copy to the output dir
-      grunt.file.copy(file, outFile)
-      grunt.log.writeln("Copied #{file} to #{outFile}")
+      if mt != entry?.mtime
+        # plain js, just copy to the output dir
+        grunt.file.copy(file, outFile)
+        grunt.log.writeln("Copied #{file} to #{outFile}")
+        timestampCache[file] = mtime: mt
       return
     outFile = outFile.replace(/\.coffee$/, '.js')
     fileOutDir = path.dirname(outFile)
-    entry = buildCache.dir[file]
-    mt = mtime(file)
-    if mt != entry?.mtime or outFile not of entry?.generated
-      if mt != entry?.mtime
-        src = grunt.file.read(file)
-        try
-          compiled = compile(src, {
-            sourceMap: options.sourceMap
-            bare: false
-          })
-        catch e
-          grunt.log.error("#{e.message}(file: #{file}, line: #{e.location.last_line + 1}, column: #{e.location.last_column})")
-          throw e
-        grunt.log.writeln("Compiled #{file}")
-        if options.sourceMap
-          {js: compiled, v3SourceMap} = compiled
-          v3SourceMap = JSON.parse(v3SourceMap)
-          v3SourceMap.sourceRoot = path.relative(fileOutDir, cwd)
-          v3SourceMap.file = path.basename(outFile)
-          v3SourceMap.sources[0] = path.relative(cwd, file)
-          v3SourceMap = JSON.stringify(v3SourceMap)
-          compiled += "\n\n//@ sourceMappingURL=#{path.basename(outFile)}.map"
-          grunt.file.write("#{outFile}.map", v3SourceMap)
-          grunt.log.writeln("File #{outFile}.map was created")
-        buildCache.dir[file] =
-          mtime: mt
-          compiled: compiled
-          map: v3SourceMap
-          generated: {}
+    if mt != entry?.mtime
+      src = grunt.file.read(file)
+      try
+        compiled = compile(src, {
+          sourceMap: options.sourceMap
+          bare: false
+        })
+      catch e
+        grunt.log.error("#{e.message}(file: #{file}, line: #{e.location.last_line + 1}, column: #{e.location.last_column})")
+        throw e
+      grunt.log.writeln("Compiled #{file}")
+      if options.sourceMap
+        {js: compiled, v3SourceMap} = compiled
+        v3SourceMap = JSON.parse(v3SourceMap)
+        v3SourceMap.sourceRoot = path.relative(fileOutDir, cwd)
+        v3SourceMap.file = path.basename(outFile)
+        v3SourceMap.sources[0] = path.relative(cwd, file)
+        v3SourceMap = JSON.stringify(v3SourceMap)
+        compiled += "\n\n//@ sourceMappingURL=#{path.basename(outFile)}.map"
+        grunt.file.write("#{outFile}.map", v3SourceMap)
+        grunt.log.writeln("File #{outFile}.map was created")
+      timestampCache[file] = mtime: mt
       grunt.file.write(outFile, compiled)
       grunt.log.writeln("File #{outFile} was created")
-      buildCache.dir[file].generated[outFile] = null
 
+  grunt.file.write(TIMESTAMP_CACHE, JSON.stringify(timestampCache))
 
 # Function adapted from the helper function with same name  thein traceur
 # compiler source code.
@@ -247,7 +250,7 @@ buildToFile = (grunt, options, src) ->
     fp = path.join(cwd, fn)
     if fp of processed
       continue
-    if (mt = mtime(fp)) != buildCache.file[fp]?.mtime
+    if (mt = mtime(fp)) != buildCache[fp]?.mtime
       deps = []
       if (/\.coffee$/.test(fp))
         try
@@ -266,7 +269,7 @@ buildToFile = (grunt, options, src) ->
           grunt, js, v3SourceMap, fn, fp, cwd, deps, amdDeps)
       else
         js = replaceRequires(grunt, js, fn, fp, cwd, deps, amdDeps)
-      cacheEntry = buildCache.file[fp] =
+      cacheEntry = buildCache[fp] =
         {js: js, mtime: mt, v3SourceMap: v3SourceMap, deps: deps, fn: fn}
       if /\.coffee$/.test(fp)
         grunt.log.writeln("Compiled #{fp}")
@@ -274,7 +277,7 @@ buildToFile = (grunt, options, src) ->
         grunt.log.writeln("Transformed #{fp}")
     else
       # Use the entry from cache
-      {deps, js, v3SourceMap, fn} = cacheEntry = buildCache.file[fp]
+      {deps, js, v3SourceMap, fn} = cacheEntry = buildCache[fp]
     if deps.length
       depsProcessed = true
       for dep in deps
