@@ -13,19 +13,16 @@ module.exports = (grunt) ->
 
     coffee_build:
       options:
-        wrap: true
-        sourceMap: true
-        disableModuleWrap: ['index.coffee']
+        src_base: 'test'
+        src: ['**/*.coffee', 'plain.js']
       file:
-        cwd: 'test'
-        src: ['**/*.coffee', 'plain.js']
-        dest: 'build/build.js'
+        options:
+          disableModuleWrap: 'index.coffee'
+          includedDeps: 'test/includedDep.js'
+          dest: 'build/build.js'
       directory:
-        expand: true
-        flatten: false
-        cwd: 'test'
-        src: ['**/*.coffee', 'plain.js']
-        dest: './build/all'
+        options:
+          dest: './build/all'
 
 
   grunt.loadTasks('tasks')

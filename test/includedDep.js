@@ -1,0 +1,1 @@
+global.DEP = {name: 'dep'};
