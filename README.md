@@ -51,46 +51,58 @@ third party library handling is also illustrated:
   coffee_build:
       options: # options shared across all targets:
         moduleId: 'Vm'
-        # it is necessary to specify a main file which exports the
-        # module public API, just like one normally does in a package.json
-        # file 
+        # It is necessary to specify a main file which exports the package
+        # public API, just like one normally does in a package.json file.
         main: 'src/index.coffee'
         src: 'src/**/*.coffee'
+        # this package exports a constructor function(Vm), but to maintain
+        # consistency with the package name we also export to the 'vm.js'
+        # alias
+        globalAliases: ['Vm', 'vm.js']
       browser:
-        # this target will build everything to a single umd module.
+        # This target will build everything to a single umd module.
         # it is meant for javascript environments without a module loader
-        # like web browsers, but it should work anywhere.
+        # like web browsers, but it should also work in commonjs or amd
+        # environments.
         options:
-          # if you depend on a third party library of a specific version
-          # and are targeting web browsers without a module loader,
-          # bundle the library in the 'includedDeps' options and it will be
-          # run in a fake global object/context so it can coexists with
-          # other versions of the library already loaded.
-          # As an altenative you can just load the third party library
-          # separately.
-          # 
-          # In this particular case everything works because esprima uses the
-          # same name for the node.js module and the browser global object(it
-          # is also wrapped in umd). 
-          # 
-          # In most cases this should work as long as the library is consistent
-          # regarding its global object alias and commonjs module name
+          # If you depend on a third party library of a specific version
+          # or are targeting web browsers without a module loader
+          # it is possible bundle the library with the rest of the code
+          # by specifying its path in the 'includedDeps' options. Bundled
+          # libraries run in a fake global object/context/window so it
+          # can coexist with other versions of the library already loaded.
+          #
+          # As an altenative you can just load the library separately.
+          #
+          # In either case, requiring the library should just work as long
+          # as it uses its package name(the string you pass to the 'require'
+          # function) as a global alias. Esprima meets this condition.
+          #
+          # If the library uses a different global alias it is still possible
+          # to use it by specifying a map of alias -> global property 
+          # in the 'depAliases' option
+          #
+          # For example if esprima exported its API to the global property
+          # 'ESPRIMA' then the 'require("esprima")' calls would not work
+          # out-of-box. The following option added to browser-specific build
+          # options would fix the problem:
+          # depAliases: {esprima: 'ESPRIMA'};
           includedDeps: 'node_modules/esprima/esprima.js'
           dest: 'build/browser/vm.js'
       browser_test:
-        # this target will build a bundle containing the code plus
-        # automated tests. no need to add the files in the 'src' directory
+        # This target will bundle the code plus automated tests into
+        # a single js file. No need to add the files in the 'src' directory
         # since the tests will require the source files
         options:
           src: 'test/**/*.coffee'
           dest: 'build/browser/test.js'
       nodejs_test:
-        # while the above target could also be reused, this is preferred
-        # when you dont need to re-run browser tests everytime,
-        # as only modified files will ever need to be recompiled since
-        # files are being compiled individually. (when merging compilation
-        # will only be cached in memory, so it works better with
-        # grunt-contrib-watch and nospawn: true)
+        # While the above target could also be reused, this is preferred
+        # when you dont need to re-run browser tests everytime(or are
+        # writing a node.js-only package), as only modified files will ever
+        # need to be recompiled since the compiled out is being cached
+        # to disk. (When merging compilation will only be cached in memory,
+        # so it works better with grunt-contrib-watch and nospawn: true)
         options:
           src: ['src/**/*.coffee', 'test/**/*.coffee']
           # if the destination doesnt end with '.js' it will be considered
@@ -98,6 +110,8 @@ third party library handling is also illustrated:
           dest: 'build/nodejs'
 ```
 
+You may have noticed that there's not a 'release target' for node.js. This
+is because I prefer to 
 ### Comments
 
 The main reason I wrote this task is because I couldn't get any existing grunt

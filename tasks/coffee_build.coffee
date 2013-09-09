@@ -332,6 +332,10 @@ buildToFile = (grunt, options, src) ->
 render = (grunt, code, options, amdDeps) ->
   amdDeps = Object.keys(amdDeps)
   globalAliases = options.globalAliases
+  depAliases = '{}'
+
+  if options.depAliases and typeof options.depAliases == 'object'
+    depAliases = JSON.stringify(options.depAliases)
 
   if options.moduleId
     if Array.isArray(globalAliases)
@@ -362,6 +366,7 @@ render = (grunt, code, options, amdDeps) ->
     globalAliases: globalAliases
     amdDeps: ("'#{dep}'" for dep in amdDeps).join(', ')
     includedDeps: includedDeps
+    depAliases: depAliases
 
   return UMD_TEMPLATE(ctx)
 
@@ -396,12 +401,16 @@ UMD_TEMPLATE = handlebars.compile(
         define({{#if moduleId}}'{{moduleId}}', {{/if}}[{{#if amdDeps}}{{{amdDeps}}}, {{/if}}'require', 'exports', 'module'], factory);
     }
     else {
+        var mod = {exports: {}};
+        var exp = mod.exports;
+        var depAliases = {{{depAliases}}};
         var req = function(id) {
-          if (!(id in fakeGlobal) && !(id in root)) throw new Error('Module ' + id + ' not found');
+          var name = id;
+          if (id in depAliases) id = depAliases[id];
+          if (!(id in fakeGlobal) && !(id in root))
+            throw new Error('Module ' + name + ' could not be resolved');
           return fakeGlobal[id] || root[id];
-        },
-          mod = {exports: {}},
-          exp = mod.exports;
+        };
         mod = factory(req, exp, mod);
         {{#each globalAliases}}
         root['{{{.}}}'] = mod;
