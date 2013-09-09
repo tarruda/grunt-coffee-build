@@ -211,7 +211,6 @@ generateJsSourceMap = (js) ->
   return gen.toString()
 
 
-
 # Builds all input files into a single js file, parsing 'require' calls
 # to resolve dependencies and concatenate in the proper order
 buildToFile = (grunt, options, src) ->
@@ -222,17 +221,33 @@ buildToFile = (grunt, options, src) ->
   {dest: outFile, expand} = options
   outDir = path.dirname(outFile)
 
-  if options.main
-    if Array.isArray(options.disableModuleWrap)
-      options.disableModuleWrap.push(options.main)
-    else
-      current = options.disableModuleWrap
-      options.disableModuleWrap = [options.main]
-      if current
-        options.disableModuleWrap.push(current)
+  if not options.main
+    if grunt.file.exists('package.json')
+      pkg = grunt.file.readJSON('package.json')
+      if pkg.main
+        if /\.(coffee|js)$/.test(pkg.main)
+          p = pkg.main
+        else
+          p = "#{pkg.main}.coffee"
+        p = path.normalize(p)
+        if not grunt.file.exists(p)
+          p = "#{pkg.main}.js"
+        if p not in src
+          throw new Error("'#{p}' not in src")
+        options.main = p
 
-  if options.disableModuleWrap
-    disableModuleWrap = grunt.file.expand(expand, options.disableModuleWrap)
+  if not options.main
+    throw new Error('cannot determine main module')
+
+  if Array.isArray(options.disableModuleWrap)
+    options.disableModuleWrap.push(options.main)
+  else
+    current = options.disableModuleWrap
+    options.disableModuleWrap = [options.main]
+    if current
+      options.disableModuleWrap.push(current)
+
+  disableModuleWrap = grunt.file.expand(expand, options.disableModuleWrap)
 
   if options.disableSourceMap
     disableSourceMap = grunt.file.expand(expand, options.disableSourceMap)

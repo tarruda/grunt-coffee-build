@@ -42,30 +42,31 @@ grunt restarts).
 
 ### Example usage
 
-This example shows a real project([vm.js](https://github.com/tarruda/vm.js))
-that runs on browser or node.js. It depends on the 'esprima' parser, so
-third party library handling is also illustrated:
+This is an example adapted from a real project
+([vm.js](https://github.com/tarruda/vm.js)) that runs on browser or node.js.
+It depends on the 'esprima' parser, so third party library handling is also
+ illustrated:
 
 ```coffeescript
 # Gruntfile.coffee
   coffee_build:
       options: # options shared across all targets:
-        moduleId: 'Vm'
         # It is necessary to specify a main file which exports the package
         # public API, just like one normally does in a package.json file.
-        main: 'src/index.coffee'
+        # If this is not provided it will be extracted from the package.json 
+        # file
+        main: 'src/index.js'
         src: 'src/**/*.coffee'
-        # this package exports a constructor function(Vm), but to maintain
-        # consistency with the package name we also export to the 'vm.js'
-        # alias
+        # This package exports a constructor function(aliased to Vm), but
+        # its possible to provide additional aliases 
         globalAliases: ['Vm', 'vm.js']
       browser:
-        # This target will build everything to a single umd module.
-        # it is meant for javascript environments without a module loader
-        # like web browsers, but it should also work in commonjs or amd
+        # This target will build everything to a single umd module. It is
+        # meant for javascript environments without a module loader like
+        # web browsers, but it should also work in commonjs or amd
         # environments.
         options:
-          # If you depend on a third party library of a specific version
+          # If you depend on a third party library(maybe a specific version)
           # or are targeting web browsers without a module loader
           # it is possible bundle the library with the rest of the code
           # by specifying its path in the 'includedDeps' options. Bundled
@@ -84,8 +85,8 @@ third party library handling is also illustrated:
           #
           # For example if esprima exported its API to the global property
           # 'ESPRIMA' then the 'require("esprima")' calls would not work
-          # out-of-box. The following option added to browser-specific build
-          # options would fix the problem:
+          # out-of-box. The following option can be added to browser-specific
+          # builds to fix the problem:
           # depAliases: {esprima: 'ESPRIMA'};
           includedDeps: 'node_modules/esprima/esprima.js'
           dest: 'build/browser/vm.js'
@@ -96,29 +97,34 @@ third party library handling is also illustrated:
         options:
           src: 'test/**/*.coffee'
           dest: 'build/browser/test.js'
-      nodejs_test:
-        # While the above target could also be reused, this is preferred
-        # when you dont need to re-run browser tests everytime(or are
-        # writing a node.js-only package), as only modified files will ever
-        # need to be recompiled since the compiled out is being cached
-        # to disk. (When merging compilation will only be cached in memory,
-        # so it works better with grunt-contrib-watch and nospawn: true)
+      nodejs:
+        # While the browser target could also be reused on node.js, 
+        # it is better to have a node.js-specific target(with a directory
+        # 'dest') for two reasons:
+        #   - Node.js already provides a commonjs runtime, so theres no
+        #     need to concatenate the files together.
+        #   - Only modified files will need to be recompiled since each
+        #     compiled file is cached individually on disk with a modification
+        #     timestamp. When building to a single file the processed
+        #     output will only be cached in memory, so it only works
+        #     effectively when the 'grunt-contrib-watch' task is being used
+        #      with the 'nospawn' option set.
+        #   - It integrates better with browserify
         options:
           src: ['src/**/*.coffee', 'test/**/*.coffee']
           # if the destination doesnt end with '.js' it will be considered
-          # a directory build
+          # a directory build and files will be compiled individually
           dest: 'build/nodejs'
 ```
 
-You may have noticed that there's not a 'release target' for node.js. This
-is because I prefer to 
 ### Comments
 
 The main reason I wrote this task is because I couldn't get any existing grunt
 task to do what I wanted: Provide me with a single javascript file/source map
 that maps(correctly) to the original source files and that lets me easily
 integrate javascript/coffeescript with automatic dependency resolution, while
-letting me handle platform-specific particularities without runtime hacks.
+letting me handle platform-specific particularities without having to write
+runtime hacks.
 
 The source maps generated by this task work flawless(at least in my tests).
 Debugging with
@@ -127,4 +133,4 @@ google chrome should just work.
 
 This intends to provide a one-stop solution for building commonjs 
 projects for web browsers or node.js using coffeescript and/or javascript.
-Enjoy!
+ Enjoy!
