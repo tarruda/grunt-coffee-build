@@ -406,5 +406,3 @@ module.exports = (grunt) ->
       buildToFile(grunt, options, src)
     else
       buildToDirectory(grunt, options, src)
-
-

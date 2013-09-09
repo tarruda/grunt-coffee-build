@@ -111,5 +111,6 @@ Debugging with
 [node-inspector](https://github.com/node-inspector/node-inspector)(0.3.2) or
 google chrome should just work.
 
-This intends to provide a one-stop solution for building projects for web
-browsers or node.js using coffeescript and/or javascript. Enjoy!
+This intends to provide a one-stop solution for building commonjs 
+projects for web browsers or node.js using coffeescript and/or javascript.
+Enjoy!
