@@ -370,9 +370,9 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
 
   for inc in options.include
     if inc.alias
-      if not inc.expose
-        throw new Error("specify an exposed property for #{inc.alias}")
-      depAliases[inc.alias] = inc.expose
+      if not inc.global
+        throw new Error("specify a global property for #{inc.alias}")
+      depAliases[inc.alias] = inc.global
 
   depAliases = JSON.stringify(depAliases)
   buildBundle(grunt, options, requires, include, nodeGlobals, bundleCb)
@@ -387,6 +387,7 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
     if nodeGlobals.Buffer
       count++
       b.add('./node_buffer.js')
+      b.require('buffer')
     if nodeGlobals.process
       count++
       b.add('./node_process.js')
@@ -395,8 +396,8 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
       if not /^\./.test(inc.path)
         inc.path = './' + inc.path
       args = [inc.path]
-      if inc.expose
-        args.push(expose: inc.expose)
+      if inc.alias
+        args.push(expose: inc.alias)
         includedAliases[inc.alias] = true
       b.require.apply(b, args)
     if options.ignore
@@ -503,7 +504,7 @@ umdTemplate = handlebars.compile(
           throw new Error("Cannot find module '" + alias + "'");
         return depContext[id] || root[id];
       };
-      mod = factory(req, exp, mod, depContext{{#if browserifyBuffer}}, depContext.Buffer{{/if}}{{#if browserifyProcess}}, depContext.process{{/if}});
+      mod = factory(req, exp, mod, depContext{{#if browserifyBuffer}}, self.Buffer{{/if}}{{#if browserifyProcess}}, self.process{{/if}});
 
       if (typeof define === 'function' && define.amd) {
         define({{#if moduleId}}'{{moduleId}}', {{/if}}

@@ -80,17 +80,22 @@ It depends on the 'esprima' parser, so third party library handling is also
           #
           # For example, to include angular.js the following may be used:
           # include: [
-          #   {path: './vendor/angular/angular.js', expose: 'angular'}
+          #   {path: './vendor/angular/angular.js', alias: 'angular'}
           # ]
           # then require('angular') will work.
-          # 
-          # Its possible to provide an alias to the exposed global property.
+          #
+          # For libraries that export directly to the browser global object,
+          # require('{global property}') will work. For example, if jquery
+          # was loaded from another file then require('jQuery') or
+          # require('$') would work. Its also possible to provide an alias
+          # that will work with require.
           # Eg:
           # include: [
-          #   {path: './vendor/angular/angular.js', expose: 'angular',
-          #    alias:'angular.js'}
+          #   {path: './vendor/old_lib.js', exported: 'GLOBAL_PROPERTY',
+          #    alias:'old-lib'}
           # ]
-          # then require('angular.js') should work too
+          # then require('old-lib') will resolve to object exported to
+          # to the global object.
           #
           # The 'include' option should work regardless of browserify but
           # ignore/external options will be passed directly to browserify
@@ -98,12 +103,7 @@ It depends on the 'esprima' parser, so third party library handling is also
           #
           # In this example the only dependency is 'esprima' which will
           # be bundled automatically as the browser version is available
-          # through npm(the same version is used for browser and node.js).
-          #
-          # It is also possible to require libraries loaded normally by
-          # the browser by just invoking require('{global alias}'). For
-          # example, if jquery was loaded from another file require('jQuery')
-          # or require('$') should work.
+          # through npm and browserify is enabled by default.
           dest: 'build/browser/vm.js'
       browser_test:
         # This target will bundle the code plus automated tests into
@@ -123,8 +123,11 @@ It depends on the 'esprima' parser, so third party library handling is also
         #     timestamp. When building to a single file the processed
         #     output will only be cached in memory, so it only works
         #     effectively when the 'grunt-contrib-watch' task is being used
-        #      with the 'nospawn' option set.
-        #   - It integrates better with browserify
+        #     with the 'nospawn' option set.
+        #   - When building to a single file the task will perform
+        #     additional tasks such as parsing 'require' calls recursively.
+        #   - It integrates better with browserify(only the 'top-level'
+        #     project should invoke browserify)
         options:
           browserify: false # This is not required as directory builds
                             # work exactly like normal coffeescript

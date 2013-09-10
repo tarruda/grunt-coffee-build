@@ -16,7 +16,7 @@ module.exports = (grunt) ->
         src_base: 'test'
         main: 'index.coffee'
         include: [
-          {path: 'test/includedDep.js', expose: 'DEP', alias: 'dep.js'}
+          {path: 'test/includedDep.js', global: 'DEP', alias: 'dep.js'}
         ]
       file_browser:
         options:
