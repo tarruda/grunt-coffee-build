@@ -368,10 +368,8 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
   include = options.include or []
   depAliases = {}
 
-  for inc in options.include
-    if inc.alias
-      if not inc.global
-        throw new Error("specify a global property for #{inc.alias}")
+  for inc in include
+    if inc.alias and inc.global
       depAliases[inc.alias] = inc.global
 
   depAliases = JSON.stringify(depAliases)
