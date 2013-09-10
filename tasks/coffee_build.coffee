@@ -539,15 +539,11 @@ moduleTemplate = handlebars.compile(
 
 module.exports = (grunt) ->
   grunt.registerMultiTask NAME, DESC, ->
-    done = @async()
-
     options = @options(
       sourceMap: true
       umd: true
       src_base: '.'
       browserify: true)
-
-    options.done = done
 
     if not options.dest
       throw new Error('task needs a destination')
@@ -584,6 +580,7 @@ module.exports = (grunt) ->
       src = grunt.file.expand(options.expand, options.src)
 
     if /\.js$/.test(options.dest)
+      options.done = @async()
       buildToFile(grunt, options, src)
     else
       buildToDirectory(grunt, options, src)
