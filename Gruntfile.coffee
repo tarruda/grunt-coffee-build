@@ -13,15 +13,18 @@ module.exports = (grunt) ->
 
     coffee_build:
       options:
-        main: 'index.coffee'
         src_base: 'test'
-        src: ['**/*.coffee', 'plain.js']
-      file:
+        main: 'index.coffee'
+        include: [
+          {path: 'test/includedDep.js', expose: 'dep'}
+        ]
+      file_browser:
         options:
-          includedDeps: [
-            {path: 'test/includedDep.js', expose: 'dep'}
-          ]
-          dest: 'build/build.js'
+          dest: 'build/build_browser.js'
+      file_node:
+        options:
+          browserify: false
+          dest: 'build/build_node.js'
       directory:
         options:
           dest: './build/all'

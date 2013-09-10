@@ -1,0 +1,1 @@
+global.Buffer = Buffer;

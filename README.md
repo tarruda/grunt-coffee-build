@@ -1,6 +1,6 @@
 # grunt-coffee-build
 
-> Compiles hybrid coffeescript/javscript commonjs projects to run anywhere transparently(amd, commonjs or plain browser load) 
+> Builds hybrid coffeescript/javascript commonjs projects to run anywhere transparently(amd, commonjs or plain browser load), generating combined source maps and optionally [browserifying](https://github.com/substack/node-browserify) dependencies. 
 
 ## Getting Started
 ```shell
@@ -24,11 +24,12 @@ commonjs projects just for the automatic dependency resolution and merged
 source map generation.
 
 Unlike other solutions that normalize commonjs projects to work in web
-browsers, this one won't bundle a small commonjs runtime. Instead, it will
-parse all require calls for relative paths, concatenate files in dependency
-order while wrapping each file into a commonjs-like module. All require
-calls are replaced by a module identifier generated from the file path
-(This is how google-traceur compiler handles imports when merging files)
+browsers, this one won't bundle a small commonjs runtime(unless the browserify
+option is set). Instead, it will parse all require calls for relative paths,
+concatenate files in dependency order while wrapping each file into a
+commonjs-like module.  All require calls are replaced by a module identifier
+generated from the file path (This is how google-traceur compiler handles
+imports when merging files)
 
 When compiling the project to a single file, the task will wrap everything into
 [umd](https://github.com/umdjs/umd), and the result runs anywhere a umd module
@@ -39,6 +40,9 @@ and their modification date, so only modified files will be reprocessed.
 When compiling to a directory(normal commonjs target) each file modification
 timestamp will be saved, so only modified files are recompiled(even across
 grunt restarts).
+
+Node/npm modules will be bundled if the browserify option is set and external
+libraries may be included using the 'include' option.
 
 ### Example usage
 
@@ -51,44 +55,48 @@ It depends on the 'esprima' parser, so third party library handling is also
 # Gruntfile.coffee
   coffee_build:
       options: # options shared across all targets:
-        # It is necessary to specify a main file which exports the package
-        # public API, just like one normally does in a package.json file.
-        # If this is not provided it will be extracted from the package.json 
-        # file
+        # When building to a file, it is necessary to specify a main file which
+        # will export the package public API, just like one normally does in a
+        # package.json file. If this is not provided it will be extracted
+        # from the package.json file
         main: 'src/index.js'
+        # Source files to include. For single-file builds this should not be
+        # necessary, as the task will recursively add files required by
+        # the main file.
         src: 'src/**/*.coffee'
         # This package exports a constructor function(aliased to Vm), but
         # its possible to provide additional aliases 
-        globalAliases: ['Vm', 'vm.js']
+        globalAliases: ['Vm']
+        # If provided, 'moduleId' will be used define in amd environments
+        moduleId: 'vm.js'
       browser:
         # This target will build everything to a single umd module. It is
         # meant for javascript environments without a module loader like
         # web browsers, but it should also work in commonjs or amd
         # environments.
         options:
-          # If you depend on a third party library(maybe a specific version)
-          # or are targeting web browsers without a module loader
-          # it is possible bundle the library with the rest of the code
-          # by specifying its path in the 'includedDeps' options. Bundled
-          # libraries run in a fake global object/context/window so it
-          # can coexist with other versions of the library already loaded.
+          # If the project depends on libraries not available in npm it is
+          # possible to bundle it with the 'include' option.
           #
-          # As an altenative you can just load the library separately.
+          # For example, to include angular.js the following may be used:
+          # include: [
+          #   {path: './vendor/angular/angular.js', expose: 'angular'}
+          # ]
+          # then require('angular') will work
           #
-          # In either case, requiring the library should just work as long
-          # as it uses its package name(the string you pass to the 'require'
-          # function) as a global alias. Esprima meets this condition.
+          # The ignore/external options will be passed directly to browserify
+          # (both are ignored if browserify is false) 
           #
-          # If the library uses a different global alias it is still possible
-          # to use it by specifying a map of alias -> global property 
-          # in the 'depAliases' option
+          # In this example the only dependency is 'esprima' which will
+          # be bundled automatically as the browser version is available
+          # through npm(the same version is used for browser and node.js).
           #
-          # For example if esprima exported its API to the global property
-          # 'ESPRIMA' then the 'require("esprima")' calls would not work
-          # out-of-box. The following option can be added to browser-specific
-          # builds to fix the problem:
-          # depAliases: {esprima: 'ESPRIMA'};
-          includedDeps: 'node_modules/esprima/esprima.js'
+          # It is also possible to require libraries loaded normally by
+          # the browser by invoking require('{global alias}').
+          #
+          # If the browserify option is set to false, the includes option
+          # are still going to work but the expose option is ignored
+          # (just require the global alias exposed by the library).
           dest: 'build/browser/vm.js'
       browser_test:
         # This target will bundle the code plus automated tests into
@@ -100,7 +108,7 @@ It depends on the 'esprima' parser, so third party library handling is also
       nodejs:
         # While the browser target could also be reused on node.js, 
         # it is better to have a node.js-specific target(with a directory
-        # 'dest') for two reasons:
+        # 'dest') for the following reasons:
         #   - Node.js already provides a commonjs runtime, so theres no
         #     need to concatenate the files together.
         #   - Only modified files will need to be recompiled since each
@@ -111,9 +119,12 @@ It depends on the 'esprima' parser, so third party library handling is also
         #      with the 'nospawn' option set.
         #   - It integrates better with browserify
         options:
+          browserify: false # This is not required as directory builds
+                            # work exactly like normal coffeescript
+                            # compilation(javascript files are just copied).
           src: ['src/**/*.coffee', 'test/**/*.coffee']
-          # if the destination doesnt end with '.js' it will be considered
-          # a directory build and files will be compiled individually
+          # If the destination doesnt end with '.js' it will be considered
+          # a directory build and files will be compiled/copied individually
           dest: 'build/nodejs'
 ```
 
@@ -124,7 +135,7 @@ task to do what I wanted: Provide me with a single javascript file/source map
 that maps(correctly) to the original source files and that lets me easily
 integrate javascript/coffeescript with automatic dependency resolution, while
 letting me handle platform-specific particularities without having to write
-runtime hacks.
+runtime hacks and verbose configuration.
 
 The source maps generated by this task work flawless(at least in my tests).
 Debugging with
@@ -133,4 +144,4 @@ google chrome should just work.
 
 This intends to provide a one-stop solution for building commonjs 
 projects for web browsers or node.js using coffeescript and/or javascript.
- Enjoy!
+Enjoy!
