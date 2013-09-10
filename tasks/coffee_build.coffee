@@ -336,7 +336,10 @@ buildToFile = (grunt, options, src) ->
 
 render = (grunt, code, options, requires, nodeGlobals, cb) ->
   bundleCb = (err, bundle) =>
-    if err then return cb(err)
+    if err
+      grunt.log.error(err)
+      throw err
+    debugger
 
     ctx =
       code: code
@@ -474,7 +477,6 @@ umdTemplate = handlebars.compile(
         if (typeof obj !== 'object') return true;
         for (var k in obj) {
           if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
-          console.log(k);
           return true;
         }
         return false;
