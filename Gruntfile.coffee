@@ -13,13 +13,14 @@ module.exports = (grunt) ->
 
     coffee_build:
       options:
-        depAliases: 'vm.js': 'Vm'
         main: 'index.coffee'
         src_base: 'test'
         src: ['**/*.coffee', 'plain.js']
       file:
         options:
-          includedDeps: 'test/includedDep.js'
+          includedDeps: [
+            {path: 'test/includedDep.js', expose: 'dep'}
+          ]
           dest: 'build/build.js'
       directory:
         options:
