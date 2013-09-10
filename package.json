@@ -1,7 +1,7 @@
 {
   "name": "grunt-coffee-build",
   "description": "Builds hybrid coffeescript/javascript commonjs projects to run anywhere transparently(amd, commonjs or plain browser load), generating combined source maps and optionally browserifying dependencies.",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "homepage": "https://github.com/tarruda/grunt-coffee-build",
   "author": {
     "name": "Thiago de Arruda",
