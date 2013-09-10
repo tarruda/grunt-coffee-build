@@ -1,5 +1,5 @@
 # main file, shouldn't be wrapped as it will export the package
-console.log require('DEP')
+console.log require('dep.js')
 debugger
 Dog = require './animals/dog'
 Cat = require './animals/cat'

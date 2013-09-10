@@ -346,6 +346,7 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
       browserifyBuffer: options.browserify and 'Buffer' of nodeGlobals
       browserifyProcess: options.browserify and 'process' of nodeGlobals
       mainId: options.mainId.id
+      depAliases: depAliases
 
     cb(null, umdTemplate(ctx))
 
@@ -364,13 +365,16 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
   if not globalAliases.length
     throw new Error('cannot determine a global alias for the module')
 
-  if options.include
-    include =
-      ({path: path.relative('.', inc.path)
-      expose: inc.expose} for inc in options.include)
-  else
-    include = []
+  include = options.include or []
+  depAliases = {}
 
+  for inc in options.include
+    if inc.alias
+      if not inc.expose
+        throw new Error("specify an exposed property for #{inc.alias}")
+      depAliases[inc.alias] = inc.expose
+
+  depAliases = JSON.stringify(depAliases)
   buildBundle(grunt, options, requires, include, nodeGlobals, bundleCb)
 
 
@@ -379,15 +383,13 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
   if options.browserify
     b = browserify()
     count = 0
+    includedAliases = {}
     if nodeGlobals.Buffer
       count++
       b.add('./node_buffer.js')
     if nodeGlobals.process
       count++
       b.add('./node_process.js')
-    for dep in requires
-      count++
-      b.require(dep)
     for inc in include
       count++
       if not /^\./.test(inc.path)
@@ -395,6 +397,7 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
       args = [inc.path]
       if inc.expose
         args.push(expose: inc.expose)
+        includedAliases[inc.alias] = true
       b.require.apply(b, args)
     if options.ignore
       options.ignore = grunt.file.expand(options.ignore)
@@ -410,9 +413,14 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
         if not /^\./.test(ext)
           ext = './' + ext
         b.external(ext)
+    for dep in requires
+      if dep of includedAliases
+        continue
+      count++
+      b.require(dep)
     if not count
       return cb(null, '')
-    b.bundle({}, cb)
+    b.bundle(ignoreMissing: true, cb)
   else
     includes = (grunt.file.read(inc.path) for inc in include)
     bundle = bundleTemplate(includes: includes)
@@ -445,8 +453,7 @@ umdTemplate = handlebars.compile(
     return {{{mainId}}};
   }),
   (function() {
-    var require, self, global, window, document;
-    self = global = window = document = this;
+    var require;
 
     {{{bundle}}}
 
@@ -457,28 +464,51 @@ umdTemplate = handlebars.compile(
       module.exports = factory(require, exports, module);
     }
     else {
-      // load included dependencies into a fake global/window object
-      var fakeGlobal = {};
-      var depReq = dependenciesFactory.call(fakeGlobal);
+      // provide a separate context for dependencies
+      var depContext = {};
+      var depAliases = {{{depAliases}}};
+      var depReq = dependenciesFactory.call(depContext);
       var mod = {exports: {}};
       var exp = mod.exports;
+      var exported = function(obj) {
+        // check if the module exported anything
+        if (typeof obj !== 'object') return true;
+        for (var k in obj) {
+          if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+          console.log(k);
+          return true;
+        }
+        return false;
+      };
       var req = function(id) {
+        var alias = id;
+        if (alias in depAliases) id = depAliases[alias];
         if (typeof depReq == 'function') {
           try {
-            return depReq(id);
+            var exp = depReq(alias);
+            if (exported(exp)) return exp;
           } catch (e) {
+            if (id !== alias) {
+              // it is possible that the module wasn't loaded yet and
+              // its alias is not available in the depContext object
+              try {
+                exp = depReq(id);
+                if (exported(exp)) return exp;
+              } catch (e) {
+              }
+            }
           }
         }
-        if (!(id in fakeGlobal) && !(id in root))
-          throw new Error("Cannot find module '" + id + "'");
-        return fakeGlobal[id] || root[id];
+        if (!(id in depContext) && !(id in root))
+          throw new Error("Cannot find module '" + alias + "'");
+        return depContext[id] || root[id];
       };
-      mod = factory(req, exp, mod, fakeGlobal{{#if browserifyBuffer}}, fakeGlobal.Buffer{{/if}}{{#if browserifyProcess}}, fakeGlobal.process{{/if}});
+      mod = factory(req, exp, mod, depContext{{#if browserifyBuffer}}, depContext.Buffer{{/if}}{{#if browserifyProcess}}, depContext.process{{/if}});
 
       if (typeof define === 'function' && define.amd) {
         define({{#if moduleId}}'{{moduleId}}', {{/if}}
-        [{{#if requires}}{{{requires}}}, {{/if}}
-        'module'], function(module) {
+        [{{#if amdRequires}}{{{requires}}}, {{/if}}
+        'module', 'exports', 'require'], function(module, exports, require) {
             module.exports = mod;
             return mod;
          });

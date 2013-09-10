@@ -1,1 +1,1 @@
-global.DEP = {name: 'dep'};
+window.DEP = {name: 'dep'};
