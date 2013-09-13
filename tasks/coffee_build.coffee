@@ -234,8 +234,8 @@ generateJsSourceMap = (js) ->
 buildToFile = (grunt, options, src) ->
   cwd = options.src_base
   pending = {}
+  allRequires = {}
   processed = {}
-  requires = {}
   nodeGlobals = {}
   {dest: outFile, expand} = options
   outDir = path.dirname(outFile)
@@ -265,6 +265,7 @@ buildToFile = (grunt, options, src) ->
     if fp of processed
       continue
     if (mt = mtime(fp)) != buildCache[fp]?.mtime
+      requires = {}
       deps = []
       if (/\.coffee$/.test(fp))
         try
@@ -285,6 +286,7 @@ buildToFile = (grunt, options, src) ->
         mtime: mt
         v3SourceMap: v3SourceMap
         deps: deps
+        requires: requires
         fn: fn
       if /\.coffee$/.test(fp)
         grunt.log.writeln("Compiled #{fp}")
@@ -292,7 +294,9 @@ buildToFile = (grunt, options, src) ->
         grunt.log.writeln("Transformed #{fp}")
     else
       # Use the entry from cache
-      {deps, js, v3SourceMap, fn} = cacheEntry = buildCache[fp]
+      {deps, requires, js, v3SourceMap, fn} = cacheEntry = buildCache[fp]
+    for own k, v of requires
+      allRequires[k] = v
     if deps.length
       depsProcessed = true
       for dep in deps
@@ -322,7 +326,7 @@ buildToFile = (grunt, options, src) ->
           source: fn
     lineOffset += js.split('\n').length - 1
     output += js
-  render(grunt, output, options, requires, nodeGlobals, (err, output) =>
+  render(grunt, output, options, allRequires, nodeGlobals, (err, output) =>
     if err then throw err
     if options.sourceMap
       sourceMapDest = path.basename(outFile) + '.map'
@@ -339,7 +343,6 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
     if err
       grunt.log.error(err)
       throw err
-    debugger
 
     ctx =
       code: code

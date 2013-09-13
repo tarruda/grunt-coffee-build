@@ -44,7 +44,7 @@ grunt restarts).
 Node/npm modules will be bundled if the browserify option is set and external
 libraries may be included using the 'include' option.
 
-### Example usage
+### Sample configuration
 
 This is an example adapted from a real project
 ([vm.js](https://github.com/tarruda/vm.js)) that runs on browser or node.js.
