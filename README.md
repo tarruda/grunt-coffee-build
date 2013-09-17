@@ -23,26 +23,21 @@ While the name is 'coffee-build', this task may be used in javascript-only
 commonjs projects just for the automatic dependency resolution and merged
 source map generation.
 
-Unlike other solutions that normalize commonjs projects to work in web
-browsers, this one won't bundle a small commonjs runtime(unless the browserify
-option is set). Instead, it will parse all require calls for relative paths,
-concatenate files in dependency order while wrapping each file into a
-commonjs-like module.  All require calls are replaced by a module identifier
-generated from the file path (This is how google-traceur compiler handles
-imports when merging files)
+The task will parse all require calls for relative paths, concatenate files in
+dependency order while wrapping each file into a commonjs-like module.  All
+require calls are replaced by a module identifier generated from the file path
+(This is how google-traceur compiler handles imports when merging files)
 
 When compiling the project to a single file, the task will wrap everything into
 [umd](https://github.com/umdjs/umd), and the result runs anywhere a umd module
-would run. This mode of operation also integrates nicely with
-grunt-contrib-watch, as it will keep an in-memory cache of the compiled files
-and their modification date, so only modified files will be reprocessed.
+would run.
 
-When compiling to a directory(normal commonjs target) each file modification
-timestamp will be saved, so only modified files are recompiled(even across
-grunt restarts).
+The task will also cache individual file builds, so only modified files will
+need to be reprocessed again.
 
 Node/npm modules will be bundled if the browserify option is set and external
-libraries may be included using the 'include' option.
+libraries may be included using the 'include' option. Browserify builds will
+also be cached, but only in memory(useful with grunt-contrib-watch).
 
 ### Sample configuration
 

@@ -18,26 +18,40 @@ NAME = 'coffee_build'
 DESC =
   'Compiles Coffeescript files, optionally merging and generating source maps.'
 
-TIMESTAMP_CACHE = '.modification_timestamp.log'
-
 # Cache of compiledfiles, keeps track of the last modified date
 # so we can avoid processing it again.
-# Useful when this task is used in conjunction with grunt-contib-watch
-# in large coffeescript projects
-buildCache = {}
+buildCache = browserifyCache = timestampCache = null
+TIMESTAMP_CACHE = '.timestamp_cache~'
+BUILD_CACHE = '.build_cache~'
 
 
 mtime = (fp) -> fs.statSync(fp).mtime.getTime()
+
+
+process.on('exit', ->
+  # save caches to disk to speed up future builds
+  if timestampCache
+    fs.writeFileSync(TIMESTAMP_CACHE, JSON.stringify(timestampCache))
+  if buildCache
+    fs.writeFileSync(BUILD_CACHE, JSON.stringify(buildCache))
+  # don't save browserify build to disk since it can get complicated
+  # in situations where only dependencies versions change
+)
+
+
+process.on('SIGINT', process.exit)
+process.on('SIGTERM', process.exit)
 
 
 buildToDirectory = (grunt, options, src) ->
   cwd = options.src_base
   outDir = options.dest
 
-  if grunt.file.exists(TIMESTAMP_CACHE)
-    timestampCache = grunt.file.readJSON(TIMESTAMP_CACHE)
-  else
-    timestampCache = {}
+  if not timestampCache
+    if grunt.file.exists(TIMESTAMP_CACHE)
+      timestampCache = grunt.file.readJSON(TIMESTAMP_CACHE)
+    else
+      timestampCache = {}
 
   if not grunt.file.exists(outDir)
     grunt.file.mkdir(outDir)
@@ -55,7 +69,7 @@ buildToDirectory = (grunt, options, src) ->
       if not grunt.file.exists(outFile) or mt != entry?.mtime
         # plain js, just copy to the output dir
         grunt.file.copy(file, outFile)
-        grunt.log.writeln("Copied #{file} to #{outFile}")
+        grunt.log.ok("Copied #{file} to #{outFile}")
         timestampCache[file] = mtime: mt
       return
     outFile = outFile.replace(/\.coffee$/, '.js')
@@ -70,7 +84,7 @@ buildToDirectory = (grunt, options, src) ->
       catch e
         grunt.log.error("#{e.message}(file: #{file}, line: #{e.location.last_line + 1}, column: #{e.location.last_column})")
         throw e
-      grunt.log.writeln("Compiled #{file}")
+      grunt.log.ok("Compiled #{file}")
       if options.sourceMap
         {js: compiled, v3SourceMap} = compiled
         v3SourceMap = JSON.parse(v3SourceMap)
@@ -80,12 +94,10 @@ buildToDirectory = (grunt, options, src) ->
         v3SourceMap = JSON.stringify(v3SourceMap)
         compiled += "\n\n//@ sourceMappingURL=#{path.basename(outFile)}.map"
         grunt.file.write("#{outFile}.map", v3SourceMap)
-        grunt.log.writeln("File #{outFile}.map was created")
+        grunt.log.ok("File #{outFile}.map was created")
       timestampCache[file] = mtime: mt
       grunt.file.write(outFile, compiled)
-      grunt.log.writeln("File #{outFile} was created")
-
-  grunt.file.write(TIMESTAMP_CACHE, JSON.stringify(timestampCache))
+      grunt.log.ok("File #{outFile} was created")
 
 # Function adapted from the helper function with same name  thein traceur
 # compiler source code.
@@ -98,7 +110,7 @@ buildToDirectory = (grunt, options, src) ->
 # '$$__a_b_d'
 #
 # This assumes you won't name your variables using this prefix
-generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$__') ->
+generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$$__$$__') ->
   try
     cwd = path.resolve(cwd)
     from = path.resolve(path.dirname(from))
@@ -128,8 +140,8 @@ replaceRequires = (grunt, js, fn, fp, cwd, deps, requires) ->
       node.expression.name != 'require' or
       (node.args.length != 1 or
        not /^\.(?:\.)?\//.test(node.args[0].value) and
-       grunt.log.warn(
-         "Cannot resolve '#{displayNode(node)}' in file #{fn}")) or
+       grunt.log.writeln(
+         "Absolute 'require' call in file #{fn}: '#{displayNode(node)}'")) or
       not (mod = generateNameForUrl(grunt, node.args[0].value, fp, cwd)))
         if node instanceof UglifyJS.AST_Call and
         node.expression.name == 'require' and node.args.length == 1
@@ -240,6 +252,12 @@ buildToFile = (grunt, options, src) ->
   {dest: outFile, expand} = options
   outDir = path.dirname(outFile)
 
+  if not buildCache
+    if grunt.file.exists(BUILD_CACHE)
+      buildCache = grunt.file.readJSON(BUILD_CACHE)
+    else
+      buildCache = {}
+
   options.mainId = generateNameForUrl(grunt, options.main, './')
 
   if options.disableSourceMap
@@ -289,9 +307,9 @@ buildToFile = (grunt, options, src) ->
         requires: requires
         fn: fn
       if /\.coffee$/.test(fp)
-        grunt.log.writeln("Compiled #{fp}")
+        grunt.log.ok("Compiled #{fp}")
       else
-        grunt.log.writeln("Transformed #{fp}")
+        grunt.log.ok("Transformed #{fp}")
     else
       # Use the entry from cache
       {deps, requires, js, v3SourceMap, fn} = cacheEntry = buildCache[fp]
@@ -332,9 +350,9 @@ buildToFile = (grunt, options, src) ->
       sourceMapDest = path.basename(outFile) + '.map'
       output += "\n\n//@ sourceMappingURL=#{sourceMapDest}"
       grunt.file.write("#{outFile}.map", gen.toString())
-      grunt.log.writeln("File #{outFile}.map was created")
+      grunt.log.ok("File #{outFile}.map was created")
     grunt.file.write(outFile, output)
-    grunt.log.writeln("File #{outFile} was created")
+    grunt.log.ok("File #{outFile} was created")
     options.done())
 
 
@@ -382,9 +400,18 @@ render = (grunt, code, options, requires, nodeGlobals, cb) ->
   buildBundle(grunt, options, requires, include, nodeGlobals, bundleCb)
 
 
-buildBundle = (grunt, options, requires, include, nodeGlobals,
-    cb) ->
+buildBundle = (grunt, options, requires, include, nodeGlobals, cb) ->
+  browserifyCb = (err, bundle) =>
+    browserifyCache = bundle: bundle, deps: deps
+    cb(null, bundle)
+
   if options.browserify
+    deps = requires.sort().toString()
+    if browserifyCache and browserifyCache.deps == deps
+      grunt.log.writeln(
+        'Dependencies not modified, will use the browserify cache')
+      # deps havent changed, return from cache
+      return cb(null, browserifyCache.bundle)
     b = browserify()
     count = 0
     includedAliases = {}
@@ -425,7 +452,7 @@ buildBundle = (grunt, options, requires, include, nodeGlobals,
       b.require(dep)
     if not count
       return cb(null, '')
-    b.bundle(ignoreMissing: true, cb)
+    b.bundle(ignoreMissing: true, browserifyCb)
   else
     includes = (grunt.file.read(inc.path) for inc in include)
     bundle = bundleTemplate(includes: includes)
