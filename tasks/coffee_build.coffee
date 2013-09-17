@@ -110,7 +110,7 @@ buildToDirectory = (grunt, options, src) ->
 # '$$__a_b_d'
 #
 # This assumes you won't name your variables using this prefix
-generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$$__$$__') ->
+generateNameForUrl = (grunt, url, from, cwd = '.', prefix = '$__') ->
   try
     cwd = path.resolve(cwd)
     from = path.resolve(path.dirname(from))
