@@ -534,7 +534,7 @@ umdTemplate = handlebars.compile(
           throw new Error("Cannot find module '" + alias + "'");
         return depContext[id] || root[id];
       };
-      mod = factory(req, exp, mod, depContext{{#if browserifyBuffer}}, self.Buffer{{/if}}{{#if browserifyProcess}}, self.process{{/if}});
+      mod = factory(req, exp, mod, self{{#if browserifyBuffer}}, self.Buffer{{/if}}{{#if browserifyProcess}}, self.process{{/if}});
 
       if (typeof define === 'function' && define.amd) {
         define({{#if moduleId}}'{{moduleId}}', {{/if}}
