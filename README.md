@@ -13,6 +13,16 @@ Once the plugin has been installed, it may be enabled inside your Gruntfile with
 grunt.loadNpmTasks('grunt-coffee-build');
 ```
 
+### The fastest way of getting started with this task:
+```shell
+npm install -g grunt-init  # if you dont have
+git clone git://github.com/tarruda/grunt-init-umd-commonjs-coffee ~/.grunt-init/umd-commonjs-coffee
+mkdir project_name
+cd project_name
+grunt-init umd-commonjs-coffee # answer questions
+npm install # install dev dependencies
+```
+
 ### Overview
 
 This task will take care of compiling, merging and generating source maps for
