@@ -282,7 +282,10 @@ buildToFile = (grunt, options, src) ->
     fp = path.join(cwd, fn)
     if fp of processed
       continue
-    if (mt = mtime(fp)) != buildCache[fp]?.mtime
+    if fp of buildCache and not grunt.file.exists(fp)
+      # refresh the build cache
+      delete buildCache[fp]
+    if buildCache[fp] and (mt = mtime(fp)) != buildCache[fp].mtime
       requires = {}
       deps = []
       if (/\.coffee$/.test(fp))
