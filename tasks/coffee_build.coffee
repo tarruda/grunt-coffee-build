@@ -285,7 +285,7 @@ buildToFile = (grunt, options, src) ->
     if fp of buildCache and not grunt.file.exists(fp)
       # refresh the build cache
       delete buildCache[fp]
-    if buildCache[fp] and (mt = mtime(fp)) != buildCache[fp].mtime
+    if (not buildCache[fp]) or (mt = mtime(fp)) != buildCache[fp].mtime
       requires = {}
       deps = []
       if (/\.coffee$/.test(fp))
