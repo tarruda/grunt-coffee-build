@@ -1,3 +1,5 @@
+# This is no longer being maintained, use [powerbuild](https://github.com/tarruda/powerbuild) instead.
+
 # grunt-coffee-build
 
 > Builds hybrid coffeescript/javascript commonjs projects to run anywhere transparently(amd, commonjs or plain browser load), generating combined source maps and optionally [browserifying](https://github.com/substack/node-browserify) dependencies. 
